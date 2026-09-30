@@ -1,0 +1,6 @@
+{
+  "name": "عاداتي",
+  "description": "تطبيق لتتبع العادات اليومية بواجهة عربية وتصميم أرجواني داكن أنيق يدعم اتجاه اليمين لليسار",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
