@@ -14,7 +14,13 @@ data class Habit(
     val colorHex: String = "#A855F7",
     val timeOfDay: String = "ANYTIME", // MORNING, AFTERNOON, EVENING, ANYTIME
     val notes: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    // Habit Stacking fields (Atomic Habits)
+    val anchorHabitId: Long? = null,
+    val stackCue: String = "", // e.g. "بعد شرب قهوة الصباح مباشرة"
+    // Health Integration fields
+    val isHealthSynced: Boolean = false,
+    val targetSteps: Int = 10000
 )
 
 @Entity(tableName = "habit_completions")
@@ -30,5 +36,10 @@ data class HabitItemUiState(
     val habit: Habit,
     val isCompletedToday: Boolean,
     val currentStreak: Int,
-    val totalCompletions: Int
+    val totalCompletions: Int,
+    val isStreakFrozen: Boolean = false,
+    val momentumScore: Int = 100,
+    val freezeAvailable: Boolean = true,
+    val anchorHabitName: String? = null,
+    val stackedHabitCount: Int = 0
 )

@@ -11,8 +11,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface HabitDao {
-    @Query("SELECT * FROM habits ORDER BY id DESC")
+
+    @Query("SELECT * FROM habits ORDER BY id ASC")
     fun getAllHabits(): Flow<List<Habit>>
+
+    @Query("SELECT * FROM habits ORDER BY id ASC")
+    suspend fun getAllHabitsList(): List<Habit>
 
     @Query("SELECT * FROM habits WHERE id = :id")
     suspend fun getHabitById(id: Long): Habit?
@@ -33,5 +37,5 @@ interface HabitDao {
     suspend fun deleteAllHabits()
 
     @Query("SELECT COUNT(*) FROM habits")
-    suspend fun getHabitCount(): Int
+    suspend fun getHabitsCount(): Int
 }

@@ -9,10 +9,11 @@ import com.example.data.model.HabitCompletion
 
 @Database(
     entities = [Habit::class, HabitCompletion::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class HabitDatabase : RoomDatabase() {
+
     abstract fun habitDao(): HabitDao
     abstract fun habitCompletionDao(): HabitCompletionDao
 
@@ -25,8 +26,10 @@ abstract class HabitDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     HabitDatabase::class.java,
-                    "habits_master.db"
-                ).fallbackToDestructiveMigration().build()
+                    "habit_database"
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

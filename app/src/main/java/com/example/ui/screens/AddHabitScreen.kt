@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -40,6 +42,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -58,19 +62,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.HabitIcons
 import com.example.ui.HabitViewModel
-import com.example.ui.theme.BorderPurple
-import com.example.ui.theme.BrightLilac
-import com.example.ui.theme.DeepVioletSurface
-import com.example.ui.theme.MidnightPurple
-import com.example.ui.theme.RoyalPurpleCard
-import com.example.ui.theme.RoyalPurpleElevated
-import com.example.ui.theme.RoyalPurpleHighlight
-import com.example.ui.theme.TextMutedLight
-import com.example.ui.theme.TextPrimaryLight
-import com.example.ui.theme.TextSecondaryLight
-import com.example.ui.theme.VividPurple
+import com.example.ui.localization.Strings
+import com.example.ui.theme.AppTheme
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -79,10 +75,11 @@ fun AddHabitScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Back navigation support
     BackHandler {
         onNavigateBack()
     }
+
+    val strings = Strings.current
 
     var habitName by remember { mutableStateOf("") }
     var habitNameError by remember { mutableStateOf<String?>(null) }
@@ -94,6 +91,15 @@ fun AddHabitScreen(
     var selectedColorHex by remember { mutableStateOf("#38BDF8") }
     var selectedTimeOfDay by remember { mutableStateOf("ANYTIME") }
     var notes by remember { mutableStateOf("") }
+
+    // Habit Stacking & Health Integration State
+    val allExistingHabits by viewModel.allHabits.collectAsStateWithLifecycle()
+    var isStackingEnabled by remember { mutableStateOf(false) }
+    var selectedAnchorHabitId by remember { mutableStateOf<Long?>(null) }
+    var stackCue by remember { mutableStateOf("") }
+
+    var isHealthSyncEnabled by remember { mutableStateOf(false) }
+    var targetSteps by remember { mutableStateOf(10000) }
 
     val colorsList = listOf(
         "#38BDF8", // Cyan Water
@@ -107,60 +113,47 @@ fun AddHabitScreen(
     )
 
     val frequencyOptions = listOf(
-        "DAILY" to "يومي",
-        "WEEKDAYS" to "أيام العمل",
-        "WEEKENDS" to "عطلة الأسبوع",
-        "WEEKLY_3" to "3 مرات أسبوعياً",
-        "CUSTOM" to "أيام محددة"
+        "DAILY" to Strings.current.freqDaily,
+        "WEEKDAYS" to Strings.current.freqWeekdays,
+        "WEEKENDS" to Strings.current.freqWeekends,
+        "WEEKLY_3" to Strings.current.freqWeekly3,
+        "CUSTOM" to Strings.current.freqCustom
     )
 
     val timeOfDayOptions = listOf(
-        "ANYTIME" to "أي وقت",
-        "MORNING" to "صباحاً",
-        "AFTERNOON" to "ظهراً",
-        "EVENING" to "مساءً"
+        "ANYTIME" to Strings.current.timeAnytime,
+        "MORNING" to Strings.current.timeMorning,
+        "AFTERNOON" to Strings.current.timeAfternoon,
+        "EVENING" to Strings.current.timeEvening
     )
 
-    val weekDays = listOf(
-        0 to "الأحد",
-        1 to "الإثنين",
-        2 to "الثلاثاء",
-        3 to "الأربعاء",
-        4 to "الخميس",
-        5 to "الجمعة",
-        6 to "السبت"
-    )
+    val weekDays = Strings.current.daysOfWeekLabels.mapIndexed { index, label -> index to label }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MidnightPurple)
+            .background(AppTheme.colors.background)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Top App Bar with back navigation
             TopAppBar(
                 title = {
                     Text(
-                        text = "إضافة عادة جديدة",
-                        style = MaterialTheme.typography.titleLarge,
+                        text = Strings.current.addHabitTitle,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimaryLight
+                        color = AppTheme.colors.textPrimary
                     )
                 },
                 navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.testTag("back_button")
-                    ) {
+                    IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "الرجوع للرئيسية",
-                            tint = TextPrimaryLight
+                            contentDescription = Strings.current.backButtonDesc,
+                            tint = AppTheme.colors.textPrimary
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DeepVioletSurface
+                    containerColor = AppTheme.colors.surface
                 )
             )
 
@@ -168,16 +161,16 @@ fun AddHabitScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Section 1: Habit Name
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = RoyalPurpleCard),
                         shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderPurple)
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
                     ) {
                         Column(
                             modifier = Modifier
@@ -185,11 +178,10 @@ fun AddHabitScreen(
                                 .padding(16.dp)
                         ) {
                             Text(
-                                text = "اسم العادة *",
+                                text = Strings.current.habitNameLabel,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimaryLight,
-                                textAlign = TextAlign.Start
+                                color = AppTheme.colors.textPrimary
                             )
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -198,49 +190,45 @@ fun AddHabitScreen(
                                 value = habitName,
                                 onValueChange = {
                                     habitName = it
-                                    if (it.isNotBlank()) habitNameError = null
+                                    if (habitNameError != null) habitNameError = null
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("habit_name_input"),
                                 placeholder = {
                                     Text(
-                                        text = "مثال: قراءة 20 دقيقة، شرب الماء، مشي...",
-                                        color = TextMutedLight,
-                                        fontSize = 14.sp
+                                        text = Strings.current.habitNamePlaceholder,
+                                        color = AppTheme.colors.textMuted
                                     )
                                 },
                                 isError = habitNameError != null,
                                 supportingText = {
-                                    if (habitNameError != null) {
-                                        Text(
-                                            text = habitNameError ?: "",
-                                            color = MaterialTheme.colorScheme.error
-                                        )
+                                    habitNameError?.let {
+                                        Text(text = it, color = MaterialTheme.colorScheme.error)
                                     }
                                 },
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = VividPurple,
-                                    unfocusedBorderColor = RoyalPurpleHighlight,
-                                    focusedContainerColor = RoyalPurpleElevated,
-                                    unfocusedContainerColor = RoyalPurpleElevated,
-                                    focusedTextColor = TextPrimaryLight,
-                                    unfocusedTextColor = TextPrimaryLight
+                                    focusedBorderColor = AppTheme.colors.primary,
+                                    unfocusedBorderColor = AppTheme.colors.highlight,
+                                    focusedContainerColor = AppTheme.colors.cardElevated,
+                                    unfocusedContainerColor = AppTheme.colors.cardElevated,
+                                    focusedTextColor = AppTheme.colors.textPrimary,
+                                    unfocusedTextColor = AppTheme.colors.textPrimary
                                 )
                             )
                         }
                     }
                 }
 
-                // Section 2: Frequency Selector
+                // Section 2: Frequency
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = RoyalPurpleCard),
                         shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderPurple)
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
                     ) {
                         Column(
                             modifier = Modifier
@@ -248,11 +236,10 @@ fun AddHabitScreen(
                                 .padding(16.dp)
                         ) {
                             Text(
-                                text = "تكرار العادة (التكرار) *",
+                                text = Strings.current.frequencyLabel,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimaryLight,
-                                textAlign = TextAlign.Start
+                                color = AppTheme.colors.textPrimary
                             )
 
                             Spacer(modifier = Modifier.height(10.dp))
@@ -263,70 +250,72 @@ fun AddHabitScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 frequencyOptions.forEach { (key, label) ->
+                                    val isSelected = selectedFrequency == key
                                     FilterChip(
-                                        selected = selectedFrequency == key,
+                                        selected = isSelected,
                                         onClick = { selectedFrequency = key },
                                         label = { Text(label) },
                                         colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = VividPurple,
-                                            selectedLabelColor = TextPrimaryLight,
-                                            containerColor = RoyalPurpleElevated,
-                                            labelColor = TextSecondaryLight
+                                            selectedContainerColor = AppTheme.colors.primary,
+                                            selectedLabelColor = Color.White,
+                                            containerColor = AppTheme.colors.cardElevated,
+                                            labelColor = AppTheme.colors.textSecondary
                                         ),
                                         border = FilterChipDefaults.filterChipBorder(
                                             enabled = true,
-                                            selected = selectedFrequency == key,
-                                            borderColor = RoyalPurpleHighlight,
-                                            selectedBorderColor = VividPurple
+                                            selected = isSelected,
+                                            borderColor = AppTheme.colors.highlight,
+                                            selectedBorderColor = AppTheme.colors.primary
                                         ),
                                         shape = RoundedCornerShape(10.dp)
                                     )
                                 }
                             }
 
-                            // If CUSTOM, show days of week picker
                             if (selectedFrequency == "CUSTOM") {
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
                                 Text(
-                                    text = "حدد أيام التكرار:",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextSecondaryLight
+                                    text = Strings.current.selectDaysTitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AppTheme.colors.textSecondary
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    weekDays.forEach { (dayIndex, dayLabel) ->
-                                        val isSelected = selectedCustomDays.contains(dayIndex)
+                                    weekDays.forEach { (index, label) ->
+                                        val isDaySelected = selectedCustomDays.contains(index)
                                         Box(
                                             modifier = Modifier
-                                                .size(42.dp)
+                                                .size(40.dp)
                                                 .clip(CircleShape)
                                                 .background(
-                                                    if (isSelected) VividPurple else RoyalPurpleElevated
+                                                    if (isDaySelected) AppTheme.colors.primary else AppTheme.colors.cardElevated
                                                 )
                                                 .border(
                                                     width = 1.dp,
-                                                    color = if (isSelected) BrightLilac else RoyalPurpleHighlight,
+                                                    color = if (isDaySelected) AppTheme.colors.primary else AppTheme.colors.highlight,
                                                     shape = CircleShape
                                                 )
                                                 .clickable {
-                                                    if (isSelected) {
+                                                    if (isDaySelected) {
                                                         if (selectedCustomDays.size > 1) {
-                                                            selectedCustomDays.remove(dayIndex)
+                                                            selectedCustomDays.remove(index)
                                                         }
                                                     } else {
-                                                        selectedCustomDays.add(dayIndex)
+                                                        selectedCustomDays.add(index)
                                                     }
                                                 },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = dayLabel.take(1),
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) TextPrimaryLight else TextMutedLight,
-                                                fontSize = 13.sp
+                                                text = label.take(2),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = if (isDaySelected) Color.White else AppTheme.colors.textSecondary,
+                                                fontWeight = if (isDaySelected) FontWeight.Bold else FontWeight.Normal
                                             )
                                         }
                                     }
@@ -340,9 +329,9 @@ fun AddHabitScreen(
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = RoyalPurpleCard),
                         shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderPurple)
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
                     ) {
                         Column(
                             modifier = Modifier
@@ -350,43 +339,36 @@ fun AddHabitScreen(
                                 .padding(16.dp)
                         ) {
                             Text(
-                                text = "وقت الممارسة المفضل",
+                                text = Strings.current.timeOfDayLabel,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimaryLight,
-                                textAlign = TextAlign.Start
+                                color = AppTheme.colors.textPrimary
                             )
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            Row(
+                            FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 timeOfDayOptions.forEach { (key, label) ->
+                                    val isSelected = selectedTimeOfDay == key
                                     FilterChip(
-                                        modifier = Modifier.weight(1f),
-                                        selected = selectedTimeOfDay == key,
+                                        selected = isSelected,
                                         onClick = { selectedTimeOfDay = key },
-                                        label = {
-                                            Text(
-                                                text = label,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier.fillMaxWidth(),
-                                                fontSize = 12.sp
-                                            )
-                                        },
+                                        label = { Text(label) },
                                         colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = VividPurple,
-                                            selectedLabelColor = TextPrimaryLight,
-                                            containerColor = RoyalPurpleElevated,
-                                            labelColor = TextSecondaryLight
+                                            selectedContainerColor = AppTheme.colors.primary,
+                                            selectedLabelColor = Color.White,
+                                            containerColor = AppTheme.colors.cardElevated,
+                                            labelColor = AppTheme.colors.textSecondary
                                         ),
                                         border = FilterChipDefaults.filterChipBorder(
                                             enabled = true,
-                                            selected = selectedTimeOfDay == key,
-                                            borderColor = RoyalPurpleHighlight,
-                                            selectedBorderColor = VividPurple
+                                            selected = isSelected,
+                                            borderColor = AppTheme.colors.highlight,
+                                            selectedBorderColor = AppTheme.colors.primary
                                         ),
                                         shape = RoundedCornerShape(10.dp)
                                     )
@@ -396,87 +378,67 @@ fun AddHabitScreen(
                     }
                 }
 
-                // Section 4: Icon Selector
+                // Section 4: Icon Selection
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = RoyalPurpleCard),
                         shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderPurple)
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "أيقونة العادة *",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimaryLight
-                                )
-
-                                val activeIcon = HabitIcons.allIcons.firstOrNull { it.id == selectedIconId }
-                                if (activeIcon != null) {
-                                    Text(
-                                        text = activeIcon.nameArabic,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = BrightLilac,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
+                            Text(
+                                text = Strings.current.habitIconLabel,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = AppTheme.colors.textPrimary
+                            )
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            FlowRow(
+                            LazyRow(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                HabitIcons.allIcons.forEach { iconItem ->
+                                items(HabitIcons.allIcons) { iconItem ->
                                     val isSelected = selectedIconId == iconItem.id
-                                    val itemColor = HabitIcons.getColor(selectedColorHex)
-
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier
-                                            .width(72.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(
-                                                if (isSelected) RoyalPurpleHighlight else RoyalPurpleElevated
-                                            )
-                                            .border(
-                                                width = if (isSelected) 2.dp else 1.dp,
-                                                color = if (isSelected) itemColor else RoyalPurpleHighlight,
-                                                shape = RoundedCornerShape(12.dp)
-                                            )
-                                            .clickable {
-                                                selectedIconId = iconItem.id
-                                                // Optional: pick default color of icon if not custom set
-                                                selectedColorHex = iconItem.defaultColorHex
-                                            }
-                                            .padding(vertical = 10.dp, horizontal = 4.dp)
-                                            .testTag("icon_${iconItem.id}")
+                                        modifier = Modifier.clickable { selectedIconId = iconItem.id }
                                     ) {
-                                        Icon(
-                                            imageVector = iconItem.icon,
-                                            contentDescription = iconItem.nameArabic,
-                                            tint = if (isSelected) itemColor else TextMutedLight,
-                                            modifier = Modifier.size(28.dp)
-                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(52.dp)
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .background(
+                                                    if (isSelected) AppTheme.colors.primary else AppTheme.colors.cardElevated
+                                                )
+                                                .border(
+                                                    width = if (isSelected) 2.dp else 1.dp,
+                                                    color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.highlight,
+                                                    shape = RoundedCornerShape(14.dp)
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = iconItem.icon,
+                                                contentDescription = iconItem.nameArabic,
+                                                tint = if (isSelected) Color.White else AppTheme.colors.textSecondary,
+                                                modifier = Modifier.size(26.dp)
+                                            )
+                                        }
+
                                         Spacer(modifier = Modifier.height(4.dp))
+
                                         Text(
-                                            text = iconItem.nameArabic.split(" ").first(),
+                                            text = iconItem.nameArabic,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = if (isSelected) TextPrimaryLight else TextMutedLight,
-                                            fontSize = 11.sp,
-                                            maxLines = 1
+                                            color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textMuted,
+                                            fontSize = 11.sp
                                         )
                                     }
                                 }
@@ -485,13 +447,13 @@ fun AddHabitScreen(
                     }
                 }
 
-                // Section 5: Color Selector
+                // Section 5: Color Accent
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = RoyalPurpleCard),
                         shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderPurple)
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
                     ) {
                         Column(
                             modifier = Modifier
@@ -499,40 +461,39 @@ fun AddHabitScreen(
                                 .padding(16.dp)
                         ) {
                             Text(
-                                text = "لون تمييز العادة",
+                                text = Strings.current.habitColorLabel,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimaryLight,
-                                textAlign = TextAlign.Start
+                                color = AppTheme.colors.textPrimary
                             )
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
                             LazyRow(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                items(colorsList) { hex ->
-                                    val isSelected = selectedColorHex.equals(hex, ignoreCase = true)
-                                    val swatchColor = HabitIcons.getColor(hex)
+                                items(colorsList) { hexColor ->
+                                    val isSelected = selectedColorHex.equals(hexColor, ignoreCase = true)
+                                    val parsedColor = Color(android.graphics.Color.parseColor(hexColor))
 
                                     Box(
                                         modifier = Modifier
-                                            .size(40.dp)
+                                            .size(44.dp)
                                             .clip(CircleShape)
-                                            .background(swatchColor)
+                                            .background(parsedColor)
                                             .border(
-                                                width = if (isSelected) 3.dp else 1.dp,
-                                                color = if (isSelected) Color.White else BorderPurple,
+                                                width = if (isSelected) 3.dp else 0.dp,
+                                                color = if (isSelected) Color.White else Color.Transparent,
                                                 shape = CircleShape
                                             )
-                                            .clickable { selectedColorHex = hex },
+                                            .clickable { selectedColorHex = hexColor },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (isSelected) {
                                             Icon(
                                                 imageVector = Icons.Default.Check,
-                                                contentDescription = null,
+                                                contentDescription = "Selected",
                                                 tint = Color.White,
                                                 modifier = Modifier.size(20.dp)
                                             )
@@ -544,13 +505,13 @@ fun AddHabitScreen(
                     }
                 }
 
-                // Section 6: Notes (Optional)
+                // Section 6: Notes
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = RoyalPurpleCard),
                         shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderPurple)
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
                     ) {
                         Column(
                             modifier = Modifier
@@ -558,11 +519,10 @@ fun AddHabitScreen(
                                 .padding(16.dp)
                         ) {
                             Text(
-                                text = "ملاحظة أو دافع ملهم (اختياري)",
+                                text = Strings.current.notesLabel,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimaryLight,
-                                textAlign = TextAlign.Start
+                                color = AppTheme.colors.textPrimary
                             )
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -573,8 +533,8 @@ fun AddHabitScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 placeholder = {
                                     Text(
-                                        text = "اكتب كلمة تشجيعية أو تفاصيل تذكرك بأهمية هذه العادة...",
-                                        color = TextMutedLight,
+                                        text = Strings.current.notesPlaceholder,
+                                        color = AppTheme.colors.textMuted,
                                         fontSize = 13.sp
                                     )
                                 },
@@ -582,19 +542,265 @@ fun AddHabitScreen(
                                 maxLines = 4,
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = VividPurple,
-                                    unfocusedBorderColor = RoyalPurpleHighlight,
-                                    focusedContainerColor = RoyalPurpleElevated,
-                                    unfocusedContainerColor = RoyalPurpleElevated,
-                                    focusedTextColor = TextPrimaryLight,
-                                    unfocusedTextColor = TextPrimaryLight
+                                    focusedBorderColor = AppTheme.colors.primary,
+                                    unfocusedBorderColor = AppTheme.colors.highlight,
+                                    focusedContainerColor = AppTheme.colors.cardElevated,
+                                    unfocusedContainerColor = AppTheme.colors.cardElevated,
+                                    focusedTextColor = AppTheme.colors.textPrimary,
+                                    unfocusedTextColor = AppTheme.colors.textPrimary
                                 )
                             )
                         }
                     }
                 }
 
-                // Section 7: Save & Cancel Buttons
+                // Section 7: Habit Stacking (Atomic Habits)
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Link,
+                                        contentDescription = null,
+                                        tint = Color(0xFF818CF8),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = Strings.current.habitStackingTitle,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AppTheme.colors.textPrimary
+                                        )
+                                        Text(
+                                            text = Strings.current.habitStackingDesc,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = AppTheme.colors.textMuted,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+
+                                Switch(
+                                    checked = isStackingEnabled,
+                                    onCheckedChange = { isStackingEnabled = it },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = Color(0xFF6366F1),
+                                        uncheckedThumbColor = AppTheme.colors.textMuted,
+                                        uncheckedTrackColor = AppTheme.colors.cardElevated
+                                    )
+                                )
+                            }
+
+                            if (isStackingEnabled) {
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Text(
+                                    text = Strings.current.anchorHabitLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = AppTheme.colors.textSecondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                if (allExistingHabits.isEmpty()) {
+                                    Text(
+                                        text = "لا توجد عادات مسجلة مسبقاً للربط بها. ستكون هذه عادتك الأولى!",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppTheme.colors.textMuted
+                                    )
+                                } else {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        items(allExistingHabits) { habit ->
+                                            val isSelected = selectedAnchorHabitId == habit.id
+                                            FilterChip(
+                                                selected = isSelected,
+                                                onClick = {
+                                                    selectedAnchorHabitId = if (isSelected) null else habit.id
+                                                    if (!isSelected && stackCue.isEmpty()) {
+                                                        stackCue = "بعد ${habit.name} مباشرة ✨"
+                                                    }
+                                                },
+                                                label = { Text("بعد: ${habit.name}") },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = Color(0xFF6366F1),
+                                                    selectedLabelColor = Color.White,
+                                                    containerColor = AppTheme.colors.cardElevated,
+                                                    labelColor = AppTheme.colors.textSecondary
+                                                ),
+                                                border = FilterChipDefaults.filterChipBorder(
+                                                    enabled = true,
+                                                    selected = isSelected,
+                                                    borderColor = AppTheme.colors.highlight,
+                                                    selectedBorderColor = Color(0xFF6366F1)
+                                                ),
+                                                shape = RoundedCornerShape(10.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    Text(
+                                        text = Strings.current.stackCueLabel,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = AppTheme.colors.textSecondary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    OutlinedTextField(
+                                        value = stackCue,
+                                        onValueChange = { stackCue = it },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        placeholder = {
+                                            Text(
+                                                text = Strings.current.stackCuePlaceholder,
+                                                color = AppTheme.colors.textMuted,
+                                                fontSize = 12.sp
+                                            )
+                                        },
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = Color(0xFF6366F1),
+                                            unfocusedBorderColor = AppTheme.colors.highlight,
+                                            focusedContainerColor = AppTheme.colors.cardElevated,
+                                            unfocusedContainerColor = AppTheme.colors.cardElevated,
+                                            focusedTextColor = AppTheme.colors.textPrimary,
+                                            unfocusedTextColor = AppTheme.colors.textPrimary
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Section 8: Health & Step Counter Sync
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DirectionsWalk,
+                                        contentDescription = null,
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = Strings.current.healthSyncTitle,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AppTheme.colors.textPrimary
+                                        )
+                                        Text(
+                                            text = Strings.current.healthSyncDesc,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = AppTheme.colors.textMuted,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+
+                                Switch(
+                                    checked = isHealthSyncEnabled,
+                                    onCheckedChange = { isHealthSyncEnabled = it },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = Color(0xFF10B981),
+                                        uncheckedThumbColor = AppTheme.colors.textMuted,
+                                        uncheckedTrackColor = AppTheme.colors.cardElevated
+                                    )
+                                )
+                            }
+
+                            if (isHealthSyncEnabled) {
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Text(
+                                    text = Strings.current.targetStepsLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = AppTheme.colors.textSecondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                val stepOptions = listOf(5000, 8000, 10000, 12000, 15000)
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(stepOptions) { stepsVal ->
+                                        val isSelected = targetSteps == stepsVal
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = { targetSteps = stepsVal },
+                                            label = { Text("👣 $stepsVal خطوة") },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(0xFF10B981),
+                                                selectedLabelColor = Color.White,
+                                                containerColor = AppTheme.colors.cardElevated,
+                                                labelColor = AppTheme.colors.textSecondary
+                                            ),
+                                            border = FilterChipDefaults.filterChipBorder(
+                                                enabled = true,
+                                                selected = isSelected,
+                                                borderColor = AppTheme.colors.highlight,
+                                                selectedBorderColor = Color(0xFF10B981)
+                                            ),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Section 9: Save & Cancel Buttons
                 item {
                     Column(
                         modifier = Modifier
@@ -605,7 +811,7 @@ fun AddHabitScreen(
                         Button(
                             onClick = {
                                 if (habitName.trim().isEmpty()) {
-                                    habitNameError = "يرجى إدخال اسم العادة أولاً"
+                                    habitNameError = strings.habitNameError
                                 } else {
                                     val daysStr = if (selectedFrequency == "CUSTOM") {
                                         selectedCustomDays.sorted().joinToString(",")
@@ -619,7 +825,11 @@ fun AddHabitScreen(
                                         iconName = selectedIconId,
                                         colorHex = selectedColorHex,
                                         timeOfDay = selectedTimeOfDay,
-                                        notes = notes
+                                        notes = notes,
+                                        anchorHabitId = if (isStackingEnabled) selectedAnchorHabitId else null,
+                                        stackCue = if (isStackingEnabled) stackCue else "",
+                                        isHealthSynced = isHealthSyncEnabled,
+                                        targetSteps = if (isHealthSyncEnabled) targetSteps else 10000
                                     )
                                 }
                             },
@@ -628,21 +838,22 @@ fun AddHabitScreen(
                                 .height(52.dp)
                                 .testTag("save_habit_button"),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = VividPurple
+                                containerColor = AppTheme.colors.primary
                             ),
                             shape = RoundedCornerShape(14.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Save,
                                 contentDescription = null,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(20.dp),
+                                tint = Color.White
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "حفظ العادة",
+                                text = Strings.current.saveHabitButton,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimaryLight
+                                color = Color.White
                             )
                         }
 
@@ -653,12 +864,12 @@ fun AddHabitScreen(
                                 .height(48.dp),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = TextSecondaryLight
+                                contentColor = AppTheme.colors.textSecondary
                             ),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, RoyalPurpleHighlight)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.highlight)
                         ) {
                             Text(
-                                text = "إلغاء",
+                                text = Strings.current.cancel,
                                 fontSize = 14.sp
                             )
                         }

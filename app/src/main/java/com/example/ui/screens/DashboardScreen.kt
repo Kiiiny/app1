@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -20,17 +21,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BeachAccess
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -57,7 +63,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
@@ -69,20 +74,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.HabitItemUiState
+import com.example.ui.DashboardStats
 import com.example.ui.HabitFilter
 import com.example.ui.HabitIcons
 import com.example.ui.HabitViewModel
-import com.example.ui.theme.BrightLilac
-import com.example.ui.theme.DeepVioletSurface
-import com.example.ui.theme.LightLilac
-import com.example.ui.theme.MidnightPurple
-import com.example.ui.theme.RoyalPurpleCard
-import com.example.ui.theme.RoyalPurpleElevated
-import com.example.ui.theme.RoyalPurpleHighlight
-import com.example.ui.theme.TextMutedLight
-import com.example.ui.theme.TextPrimaryLight
-import com.example.ui.theme.TextSecondaryLight
-import com.example.ui.theme.VividPurple
+import com.example.ui.localization.LocalAppLanguage
+import com.example.ui.localization.Strings
+import com.example.ui.theme.AppTheme
+import com.example.ui.theme.CardDensity
 
 @Composable
 fun DashboardScreen(
@@ -93,13 +92,16 @@ fun DashboardScreen(
     val habitItems by viewModel.filteredHabitItems.collectAsStateWithLifecycle()
     val stats by viewModel.dashboardStats.collectAsStateWithLifecycle()
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
+    val todaySteps by viewModel.todaySteps.collectAsStateWithLifecycle()
+    val isVacationMode by viewModel.isVacationModeEnabled.collectAsStateWithLifecycle()
+    val currentLanguage = LocalAppLanguage.current
 
     var habitToDelete by remember { mutableStateOf<HabitItemUiState?>(null) }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MidnightPurple)
+            .background(AppTheme.colors.background)
     ) {
         LazyColumn(
             modifier = Modifier
@@ -108,10 +110,19 @@ fun DashboardScreen(
             contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header: Greeting and Arabic Date
+            // Vacation Mode Banner
+            if (isVacationMode) {
+                item {
+                    VacationModeBanner(
+                        onDisable = { viewModel.toggleVacationMode(false) }
+                    )
+                }
+            }
+
+            // Header: Greeting and Localized Date
             item {
                 DashboardHeader(
-                    arabicDate = viewModel.todayArabicDateDisplay
+                    formattedDate = viewModel.getTodayFormattedDate(currentLanguage)
                 )
             }
 
@@ -122,12 +133,20 @@ fun DashboardScreen(
                 )
             }
 
-            // Filter Chips (الكل، المتبقية، المكتملة)
+            // Health & Step Counter Tracker Card
+            item {
+                HealthStepsTrackerCard(
+                    steps = todaySteps,
+                    onRefresh = { viewModel.refreshSteps() },
+                    onAddTestSteps = { viewModel.addTestSteps(it) }
+                )
+            }
+
+            // Filter Chips (All, Pending, Completed)
             item {
                 FilterChipsSection(
-                    currentFilter = selectedFilter,
-                    totalCount = stats.totalCount,
-                    completedCount = stats.completedCount,
+                    selectedFilter = selectedFilter,
+                    stats = stats,
                     onFilterSelected = { viewModel.setFilter(it) }
                 )
             }
@@ -142,15 +161,15 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "عادات اليوم",
+                        text = Strings.current.todayHabits,
                         style = MaterialTheme.typography.titleLarge,
-                        color = TextPrimaryLight,
+                        color = AppTheme.colors.textPrimary,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${habitItems.size} عادات",
+                        text = "${habitItems.size} ${Strings.current.habitsCountSuffix}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextMutedLight
+                        color = AppTheme.colors.textMuted
                     )
                 }
             }
@@ -170,6 +189,7 @@ fun DashboardScreen(
                 ) { itemState ->
                     HabitCardItem(
                         itemState = itemState,
+                        cardDensity = AppTheme.cardDensity,
                         onToggle = { viewModel.toggleHabit(itemState.habit.id) },
                         onDelete = { habitToDelete = itemState }
                     )
@@ -182,23 +202,21 @@ fun DashboardScreen(
             onClick = onNavigateToAdd,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(20.dp)
+                .padding(16.dp)
                 .testTag("add_habit_fab"),
-            containerColor = VividPurple,
-            contentColor = TextPrimaryLight,
-            elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(6.dp),
+            containerColor = AppTheme.colors.primary,
+            contentColor = Color.White,
             shape = RoundedCornerShape(16.dp),
             icon = {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "إضافة عادة"
+                    contentDescription = Strings.current.addHabitFab
                 )
             },
             text = {
                 Text(
-                    text = "إضافة عادة",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    text = Strings.current.addHabitFab,
+                    fontWeight = FontWeight.Bold
                 )
             }
         )
@@ -207,20 +225,17 @@ fun DashboardScreen(
         habitToDelete?.let { habitItem ->
             AlertDialog(
                 onDismissRequest = { habitToDelete = null },
-                containerColor = DeepVioletSurface,
-                titleContentColor = TextPrimaryLight,
-                textContentColor = TextSecondaryLight,
                 title = {
                     Text(
-                        text = "حذف العادة",
+                        text = Strings.current.deleteHabitTitle,
                         fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Start
+                        color = AppTheme.colors.textPrimary
                     )
                 },
                 text = {
                     Text(
-                        text = "هل أنت متأكد من رغبتك في حذف عادة \"${habitItem.habit.name}\"؟ سيتم مسح سجل إنجازاتها نهائياً.",
-                        textAlign = TextAlign.Start
+                        text = Strings.current.deleteHabitMessage(habitItem.habit.name),
+                        color = AppTheme.colors.textSecondary
                     )
                 },
                 confirmButton = {
@@ -233,14 +248,14 @@ fun DashboardScreen(
                             containerColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text("نعم، حذف", fontWeight = FontWeight.Bold)
+                        Text(Strings.current.confirmDelete, color = Color.White)
                     }
                 },
                 dismissButton = {
                     TextButton(
                         onClick = { habitToDelete = null }
                     ) {
-                        Text("إلغاء", color = TextSecondaryLight)
+                        Text(Strings.current.cancel, color = AppTheme.colors.textSecondary)
                     }
                 }
             )
@@ -249,8 +264,50 @@ fun DashboardScreen(
 }
 
 @Composable
+fun VacationModeBanner(
+    onDisable: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF59E0B).copy(alpha = 0.15f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.4f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.BeachAccess,
+                contentDescription = null,
+                tint = Color(0xFFFBBF24),
+                modifier = Modifier.size(24.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = Strings.current.vacationActiveBanner,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFFEF08A),
+                    lineHeight = 18.sp
+                )
+            }
+            TextButton(
+                onClick = onDisable,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text("إيقاف", color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
 fun DashboardHeader(
-    arabicDate: String,
+    formattedDate: String,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -260,17 +317,17 @@ fun DashboardHeader(
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "مرحباً بك!",
+            text = Strings.current.greeting,
             style = MaterialTheme.typography.headlineMedium,
-            color = TextPrimaryLight,
+            color = AppTheme.colors.textPrimary,
             fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Start
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = arabicDate,
+            text = formattedDate,
             style = MaterialTheme.typography.bodyMedium,
-            color = BrightLilac,
+            color = AppTheme.colors.primary,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Start
         )
@@ -279,137 +336,103 @@ fun DashboardHeader(
 
 @Composable
 fun ProgressSummaryCard(
-    stats: com.example.ui.DashboardStats,
+    stats: DashboardStats,
     modifier: Modifier = Modifier
 ) {
     val animatedProgress by animateFloatAsState(
         targetValue = stats.progressFraction,
+        animationSpec = tween(durationMillis = 800),
         label = "progress_animation"
     )
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(RoyalPurpleHighlight, VividPurple.copy(alpha = 0.5f))
-                ),
-                shape = RoundedCornerShape(20.dp)
-            ),
+            .testTag("progress_card"),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = RoyalPurpleCard
+            containerColor = AppTheme.colors.card
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp)
+                .padding(20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "إنجاز اليوم",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimaryLight,
-                        textAlign = TextAlign.Start
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = if (stats.totalCount > 0) {
-                            "أنجزت ${stats.completedCount} من أصل ${stats.totalCount} عادات"
-                        } else {
-                            "لم تضف عادات لليوم بعد"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondaryLight,
-                        textAlign = TextAlign.Start
-                    )
-                }
+                Text(
+                    text = Strings.current.todayProgress,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AppTheme.colors.textPrimary
+                )
 
-                // Circular Percentage Badge
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    CircularProgressIndicator(
-                        progress = { 1f },
-                        modifier = Modifier.fillMaxSize(),
-                        color = RoyalPurpleHighlight,
-                        strokeWidth = 5.dp,
-                        trackColor = Color.Transparent,
-                        strokeCap = StrokeCap.Round
-                    )
-                    CircularProgressIndicator(
-                        progress = { animatedProgress },
-                        modifier = Modifier.fillMaxSize(),
-                        color = VividPurple,
-                        strokeWidth = 5.dp,
-                        trackColor = Color.Transparent,
-                        strokeCap = StrokeCap.Round
-                    )
-                    Text(
-                        text = "${stats.progressPercentage}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = LightLilac
-                    )
+                Text(
+                    text = if (stats.totalCount > 0) {
+                        Strings.current.progressDetailFormat(stats.completedCount, stats.totalCount)
+                    } else {
+                        Strings.current.noHabitsYet
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppTheme.colors.textSecondary
+                )
+
+                if (stats.longestStreak > 0) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalFireDepartment,
+                            contentDescription = null,
+                            tint = Color(0xFFF97316),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = Strings.current.longestStreakFormat(stats.longestStreak),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFFF97316),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Linear Progress Bar
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = VividPurple,
-                trackColor = RoyalPurpleHighlight,
-                strokeCap = StrokeCap.Round
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Streak & Motivation Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(76.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocalFireDepartment,
-                        contentDescription = "السلسلة",
-                        tint = Color(0xFFF97316),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "أعلى التزام: ${stats.longestStreak} أيام متتالية",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextPrimaryLight,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                CircularProgressIndicator(
+                    progress = { 1f },
+                    modifier = Modifier.fillMaxSize(),
+                    color = AppTheme.colors.highlight,
+                    strokeWidth = 7.dp,
+                    strokeCap = StrokeCap.Round
+                )
 
-                if (stats.completedCount == stats.totalCount && stats.totalCount > 0) {
+                CircularProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxSize(),
+                    color = AppTheme.colors.primary,
+                    strokeWidth = 7.dp,
+                    strokeCap = StrokeCap.Round
+                )
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "رائع! اكتملت جميع العادات ✨",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF34D399),
-                        fontWeight = FontWeight.Bold
+                        text = "${stats.progressPercentage}%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = AppTheme.colors.textPrimary
                     )
                 }
             }
@@ -419,263 +442,246 @@ fun ProgressSummaryCard(
 
 @Composable
 fun FilterChipsSection(
-    currentFilter: HabitFilter,
-    totalCount: Int,
-    completedCount: Int,
+    selectedFilter: HabitFilter,
+    stats: DashboardStats,
     onFilterSelected: (HabitFilter) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pendingCount = totalCount - completedCount
+    val pendingCount = stats.totalCount - stats.completedCount
 
-    LazyRow(
+    Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        item {
-            FilterChip(
-                selected = currentFilter == HabitFilter.ALL,
-                onClick = { onFilterSelected(HabitFilter.ALL) },
-                label = { Text("الكل ($totalCount)") },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = VividPurple,
-                    selectedLabelColor = TextPrimaryLight,
-                    containerColor = RoyalPurpleElevated,
-                    labelColor = TextSecondaryLight
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = currentFilter == HabitFilter.ALL,
-                    borderColor = RoyalPurpleHighlight,
-                    selectedBorderColor = VividPurple
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-        }
-        item {
-            FilterChip(
-                selected = currentFilter == HabitFilter.PENDING,
-                onClick = { onFilterSelected(HabitFilter.PENDING) },
-                label = { Text("المتبقية ($pendingCount)") },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = VividPurple,
-                    selectedLabelColor = TextPrimaryLight,
-                    containerColor = RoyalPurpleElevated,
-                    labelColor = TextSecondaryLight
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = currentFilter == HabitFilter.PENDING,
-                    borderColor = RoyalPurpleHighlight,
-                    selectedBorderColor = VividPurple
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-        }
-        item {
-            FilterChip(
-                selected = currentFilter == HabitFilter.COMPLETED,
-                onClick = { onFilterSelected(HabitFilter.COMPLETED) },
-                label = { Text("المكتملة ($completedCount)") },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = VividPurple,
-                    selectedLabelColor = TextPrimaryLight,
-                    containerColor = RoyalPurpleElevated,
-                    labelColor = TextSecondaryLight
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = currentFilter == HabitFilter.COMPLETED,
-                    borderColor = RoyalPurpleHighlight,
-                    selectedBorderColor = VividPurple
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-        }
+        FilterChip(
+            selected = selectedFilter == HabitFilter.ALL,
+            onClick = { onFilterSelected(HabitFilter.ALL) },
+            label = { Text(Strings.current.filterAllFormat(stats.totalCount)) },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = AppTheme.colors.primary,
+                selectedLabelColor = Color.White,
+                containerColor = AppTheme.colors.card,
+                labelColor = AppTheme.colors.textSecondary
+            ),
+            border = FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = selectedFilter == HabitFilter.ALL,
+                borderColor = AppTheme.colors.border,
+                selectedBorderColor = AppTheme.colors.primary
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.testTag("filter_all")
+        )
+
+        FilterChip(
+            selected = selectedFilter == HabitFilter.PENDING,
+            onClick = { onFilterSelected(HabitFilter.PENDING) },
+            label = { Text(Strings.current.filterPendingFormat(pendingCount.coerceAtLeast(0))) },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = AppTheme.colors.primary,
+                selectedLabelColor = Color.White,
+                containerColor = AppTheme.colors.card,
+                labelColor = AppTheme.colors.textSecondary
+            ),
+            border = FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = selectedFilter == HabitFilter.PENDING,
+                borderColor = AppTheme.colors.border,
+                selectedBorderColor = AppTheme.colors.primary
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.testTag("filter_pending")
+        )
+
+        FilterChip(
+            selected = selectedFilter == HabitFilter.COMPLETED,
+            onClick = { onFilterSelected(HabitFilter.COMPLETED) },
+            label = { Text(Strings.current.filterCompletedFormat(stats.completedCount)) },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = AppTheme.colors.primary,
+                selectedLabelColor = Color.White,
+                containerColor = AppTheme.colors.card,
+                labelColor = AppTheme.colors.textSecondary
+            ),
+            border = FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = selectedFilter == HabitFilter.COMPLETED,
+                borderColor = AppTheme.colors.border,
+                selectedBorderColor = AppTheme.colors.primary
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.testTag("filter_completed")
+        )
     }
 }
 
 @Composable
 fun HabitCardItem(
     itemState: HabitItemUiState,
+    cardDensity: CardDensity,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val habit = itemState.habit
-    val habitIcon = HabitIcons.getIcon(habit.iconName)
-    val accentColor = HabitIcons.getColor(habit.colorHex)
+    val isCompleted = itemState.isCompletedToday
+    val habitColor = try {
+        Color(android.graphics.Color.parseColor(habit.colorHex))
+    } catch (_: Exception) {
+        AppTheme.colors.primary
+    }
+
+    val iconVector = HabitIcons.getIconById(habit.iconName)
+    val isCompact = cardDensity == CardDensity.COMPACT
     var showMenu by remember { mutableStateOf(false) }
-
-    val frequencyText = when (habit.frequency) {
-        "DAILY" -> "يومياً"
-        "WEEKDAYS" -> "أيام العمل"
-        "WEEKENDS" -> "عطلة الأسبوع"
-        "WEEKLY_3" -> "3 مرات أسبوعياً"
-        else -> "مخصص"
-    }
-
-    val timeOfDayText = when (habit.timeOfDay) {
-        "MORNING" -> "صباحاً"
-        "AFTERNOON" -> "ظهراً"
-        "EVENING" -> "مساءً"
-        else -> "في أي وقت"
-    }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .testTag("habit_card_${habit.id}")
-            .clickable { onToggle() },
-        shape = RoundedCornerShape(18.dp),
+            .testTag("habit_item_${habit.id}"),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (itemState.isCompletedToday) {
-                DeepVioletSurface
-            } else {
-                RoyalPurpleCard
-            }
+            containerColor = if (isCompleted) AppTheme.colors.cardElevated else AppTheme.colors.card
         ),
         border = androidx.compose.foundation.BorderStroke(
-            width = if (itemState.isCompletedToday) 1.5.dp else 1.dp,
-            color = if (itemState.isCompletedToday) accentColor.copy(alpha = 0.6f) else RoyalPurpleHighlight
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            width = if (isCompleted) 1.5.dp else 1.dp,
+            color = if (isCompleted) habitColor.copy(alpha = 0.6f) else AppTheme.colors.border
+        )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(if (isCompact) 10.dp else 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Interactive Checkbox Button (Custom Styled Circle)
+            // Checkbox Circle
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(38.dp)
                     .clip(CircleShape)
                     .background(
-                        if (itemState.isCompletedToday) {
-                            accentColor
-                        } else {
-                            RoyalPurpleElevated
-                        }
-                    )
-                    .border(
-                        width = 2.dp,
-                        color = if (itemState.isCompletedToday) accentColor else RoyalPurpleHighlight,
-                        shape = CircleShape
+                        if (isCompleted) habitColor else AppTheme.colors.highlight
                     )
                     .clickable { onToggle() }
-                    .testTag("checkbox_${habit.id}"),
+                    .testTag("toggle_habit_${habit.id}"),
                 contentAlignment = Alignment.Center
             ) {
-                if (itemState.isCompletedToday) {
+                if (isCompleted) {
                     Icon(
                         imageVector = Icons.Default.Check,
-                        contentDescription = "مكتمل",
+                        contentDescription = "Completed",
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Habit Icon Badge
+            // Habit Icon Pill
             Box(
                 modifier = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(accentColor.copy(alpha = 0.15f))
-                    .border(
-                        width = 1.dp,
-                        color = accentColor.copy(alpha = 0.35f),
-                        shape = RoundedCornerShape(12.dp)
-                    ),
+                    .size(if (isCompact) 34.dp else 40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(habitColor.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = habitIcon,
-                    contentDescription = habit.name,
-                    tint = accentColor,
-                    modifier = Modifier.size(24.dp)
+                    imageVector = iconVector,
+                    contentDescription = null,
+                    tint = habitColor,
+                    modifier = Modifier.size(if (isCompact) 18.dp else 22.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Habit Details Column
+            // Habit Details
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = habit.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (itemState.isCompletedToday) TextMutedLight else TextPrimaryLight,
-                    textDecoration = if (itemState.isCompletedToday) TextDecoration.LineThrough else TextDecoration.None,
+                    color = if (isCompleted) AppTheme.colors.textMuted else AppTheme.colors.textPrimary,
+                    textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Start
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                if (habit.notes.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(2.dp))
+                // Notes
+                if (!isCompact && habit.notes.isNotBlank()) {
                     Text(
                         text = habit.notes,
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextMutedLight,
+                        color = AppTheme.colors.textMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Start
+                        fontSize = 11.sp
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Badges Row (Frequency, Time, Streak)
+                // Badges Row
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 2.dp)
                 ) {
-                    // Frequency Badge
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(RoyalPurpleElevated)
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = frequencyText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = BrightLilac,
-                            fontSize = 10.sp
-                        )
+                    // Time of Day
+                    val timeOfDayText = when (habit.timeOfDay) {
+                        "MORNING" -> Strings.current.timeMorning
+                        "AFTERNOON" -> Strings.current.timeAfternoon
+                        "EVENING" -> Strings.current.timeEvening
+                        else -> null
+                    }
+                    if (timeOfDayText != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(AppTheme.colors.highlight)
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Schedule,
+                                contentDescription = null,
+                                tint = AppTheme.colors.textMuted,
+                                modifier = Modifier.size(10.dp)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = timeOfDayText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppTheme.colors.textSecondary,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
 
-                    // Time of Day Badge
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(RoyalPurpleElevated)
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Schedule,
-                            contentDescription = null,
-                            tint = TextMutedLight,
-                            modifier = Modifier.size(10.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = timeOfDayText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondaryLight,
-                            fontSize = 10.sp
-                        )
-                    }
-
-                    // Streak Badge
-                    if (itemState.currentStreak > 0) {
+                    // Streak & Freeze Badge
+                    if (itemState.isStreakFrozen) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF0284C7).copy(alpha = 0.2f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AcUnit,
+                                contentDescription = null,
+                                tint = Color(0xFF38BDF8),
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "${Strings.current.streakFrozenBadge} (${itemState.currentStreak})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF38BDF8),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
+                    } else if (itemState.currentStreak > 0) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -699,6 +705,105 @@ fun HabitCardItem(
                             )
                         }
                     }
+
+                    // Momentum Badge
+                    if (itemState.momentumScore > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFFF59E0B).copy(alpha = 0.15f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Bolt,
+                                contentDescription = null,
+                                tint = Color(0xFFF59E0B),
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = "${itemState.momentumScore}% ${Strings.current.momentumLabel}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFF59E0B),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+
+                    // Habit Stacking Anchor Badge
+                    if (itemState.anchorHabitName != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF6366F1).copy(alpha = 0.18f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Link,
+                                contentDescription = null,
+                                tint = Color(0xFF818CF8),
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "بعد: ${itemState.anchorHabitName}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF818CF8),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    // Habit Stacking Trigger for others
+                    if (itemState.stackedHabitCount > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFFA855F7).copy(alpha = 0.18f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "محفز لـ ${itemState.stackedHabitCount} عادات 🔗",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFC084FC),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+
+                    // Health / Step Counter Sync Badge
+                    if (itemState.habit.isHealthSynced) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF10B981).copy(alpha = 0.18f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DirectionsWalk,
+                                contentDescription = null,
+                                tint = Color(0xFF34D399),
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = "${itemState.habit.targetSteps} خطوة",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF34D399),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
                 }
             }
 
@@ -710,15 +815,15 @@ fun HabitCardItem(
                 ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
-                        contentDescription = "خيارات العادة",
-                        tint = TextMutedLight
+                        contentDescription = "Options",
+                        tint = AppTheme.colors.textMuted
                     )
                 }
 
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },
-                    modifier = Modifier.background(DeepVioletSurface)
+                    modifier = Modifier.background(AppTheme.colors.surface)
                 ) {
                     DropdownMenuItem(
                         text = {
@@ -733,9 +838,8 @@ fun HabitCardItem(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
-                                    text = "حذف العادة",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyMedium
+                                    text = Strings.current.confirmDelete,
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
                         },
@@ -751,25 +855,157 @@ fun HabitCardItem(
 }
 
 @Composable
+fun HealthStepsTrackerCard(
+    steps: Int,
+    targetGoal: Int = 10000,
+    onRefresh: () -> Unit,
+    onAddTestSteps: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val progress = (steps.toFloat() / targetGoal.toFloat()).coerceIn(0f, 1f)
+    val percentage = (progress * 100).toInt()
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF10B981).copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DirectionsWalk,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = Strings.current.stepsCardTitle,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = AppTheme.colors.textPrimary
+                        )
+                        Text(
+                            text = Strings.current.stepsCardSub,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppTheme.colors.textMuted,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    IconButton(
+                        onClick = onRefresh,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = Strings.current.refreshSensor,
+                            tint = AppTheme.colors.textMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Button(
+                        onClick = { onAddTestSteps(1000) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF10B981).copy(alpha = 0.2f),
+                            contentColor = Color(0xFF10B981)
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text(
+                            text = Strings.current.addTestSteps,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = Color(0xFF10B981),
+                trackColor = AppTheme.colors.highlight,
+                strokeCap = StrokeCap.Round
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "👣 $steps من أصل $targetGoal خطوة ($percentage%)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppTheme.colors.textSecondary,
+                    fontWeight = FontWeight.Medium
+                )
+
+                if (steps >= targetGoal) {
+                    Text(
+                        text = "تم تحقيق الهدف! 🏆",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF10B981),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun EmptyHabitsState(
     filter: HabitFilter,
     onAddClicked: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = RoyalPurpleCard.copy(alpha = 0.5f)
-        ),
-        shape = RoundedCornerShape(20.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, RoyalPurpleHighlight)
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(28.dp),
+                .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -777,14 +1013,18 @@ fun EmptyHabitsState(
                 modifier = Modifier
                     .size(64.dp)
                     .clip(CircleShape)
-                    .background(RoyalPurpleElevated),
+                    .background(AppTheme.colors.highlight),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.CheckCircle,
+                    imageVector = when (filter) {
+                        HabitFilter.ALL -> Icons.Default.Add
+                        HabitFilter.COMPLETED -> Icons.Default.CheckCircle
+                        HabitFilter.PENDING -> Icons.Default.Schedule
+                    },
                     contentDescription = null,
-                    tint = BrightLilac,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(32.dp),
+                    tint = AppTheme.colors.primary
                 )
             }
 
@@ -792,13 +1032,13 @@ fun EmptyHabitsState(
 
             Text(
                 text = when (filter) {
-                    HabitFilter.ALL -> "لا توجد عادات مضافة بعد"
-                    HabitFilter.COMPLETED -> "لم تكتمل أي عادة حتى الآن"
-                    HabitFilter.PENDING -> "أحسنت! لا توجد عادات متبقية لليوم"
+                    HabitFilter.ALL -> Strings.current.emptyAllTitle
+                    HabitFilter.COMPLETED -> Strings.current.emptyCompletedTitle
+                    HabitFilter.PENDING -> Strings.current.emptyPendingTitle
                 },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimaryLight,
+                color = AppTheme.colors.textPrimary,
                 textAlign = TextAlign.Center
             )
 
@@ -806,12 +1046,12 @@ fun EmptyHabitsState(
 
             Text(
                 text = when (filter) {
-                    HabitFilter.ALL -> "ابدأ رحلة بناء عاداتك اليومية واستمر في التطوير المستمر"
-                    HabitFilter.COMPLETED -> "اضغط على مربع العادة في القائمة عند إنجازها"
-                    HabitFilter.PENDING -> "لقد أنجزت كل ما خططت له لهذا اليوم بامتياز!"
+                    HabitFilter.ALL -> Strings.current.emptyAllDesc
+                    HabitFilter.COMPLETED -> Strings.current.emptyCompletedDesc
+                    HabitFilter.PENDING -> Strings.current.emptyPendingDesc
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = TextMutedLight,
+                color = AppTheme.colors.textMuted,
                 textAlign = TextAlign.Center
             )
 
@@ -820,7 +1060,7 @@ fun EmptyHabitsState(
                 Button(
                     onClick = onAddClicked,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = VividPurple
+                        containerColor = AppTheme.colors.primary
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -830,7 +1070,7 @@ fun EmptyHabitsState(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("أضف عادتك الأولى")
+                    Text(Strings.current.addFirstHabitButton, color = Color.White)
                 }
             }
         }

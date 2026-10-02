@@ -1,11 +1,15 @@
 package com.example.ui.screens
 
+import android.app.TimePickerDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,32 +20,40 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BeachAccess
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.FormatTextdirectionRToL
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.ViewAgenda
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -57,28 +69,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.reminder.HabitReminderScheduler
 import com.example.ui.HabitViewModel
-import com.example.ui.theme.BorderPurple
-import com.example.ui.theme.BrightLilac
-import com.example.ui.theme.DeepVioletSurface
-import com.example.ui.theme.LightLilac
-import com.example.ui.theme.MidnightPurple
-import com.example.ui.theme.RoyalPurpleCard
-import com.example.ui.theme.RoyalPurpleElevated
-import com.example.ui.theme.RoyalPurpleHighlight
-import com.example.ui.theme.TextMutedLight
-import com.example.ui.theme.TextPrimaryLight
-import com.example.ui.theme.TextSecondaryLight
-import com.example.ui.theme.VividPurple
+import com.example.ui.localization.AppLanguage
+import com.example.ui.localization.LocalAppLanguage
+import com.example.ui.localization.Strings
+import com.example.ui.theme.AppTheme
+import com.example.ui.theme.AppThemePalette
+import com.example.ui.theme.CardDensity
+import com.example.ui.theme.FontScalePreference
+import com.example.ui.theme.ThemeMode
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     viewModel: HabitViewModel,
@@ -89,53 +99,43 @@ fun SettingsScreen(
         onNavigateBack()
     }
 
-    val stats by viewModel.dashboardStats.collectAsStateWithLifecycle()
+    val themeSettings by viewModel.themeSettings.collectAsStateWithLifecycle()
+    val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
     val remindersEnabled by viewModel.remindersEnabled.collectAsStateWithLifecycle()
     val reminderTime by viewModel.reminderTime.collectAsStateWithLifecycle()
+    val isVacationMode by viewModel.isVacationModeEnabled.collectAsStateWithLifecycle()
+    val isArabic = LocalAppLanguage.current.isRtl
+    val context = LocalContext.current
 
-    var showClearConfirmDialog by remember { mutableStateOf(false) }
-    var showResetConfirmDialog by remember { mutableStateOf(false) }
-    var showTimePickerMenu by remember { mutableStateOf(false) }
-
-    val reminderTimeOptions = listOf(
-        "07:00 صباحاً",
-        "08:00 صباحاً",
-        "09:00 صباحاً",
-        "13:00 ظهراً",
-        "18:00 مساءً",
-        "20:00 مساءً",
-        "21:30 ليلاً"
-    )
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var showResetTodayDialog by remember { mutableStateOf(false) }
+    var showClearAllDialog by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MidnightPurple)
+            .background(AppTheme.colors.background)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
                 title = {
                     Text(
-                        text = "الإعدادات",
-                        style = MaterialTheme.typography.titleLarge,
+                        text = Strings.current.settingsTitle,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimaryLight
+                        color = AppTheme.colors.textPrimary
                     )
                 },
                 navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.testTag("settings_back_button")
-                    ) {
+                    IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "الرجوع للرئيسية",
-                            tint = TextPrimaryLight
+                            contentDescription = Strings.current.backButtonDesc,
+                            tint = AppTheme.colors.textPrimary
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DeepVioletSurface
+                    containerColor = AppTheme.colors.surface
                 )
             )
 
@@ -146,499 +146,874 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Section 1: Overview Stats
+                // Section: Vacation & Recovery Mode (وضع الإجازة والمرض)
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = RoyalPurpleCard),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderPurple)
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.4f))
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp)
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(
-                                text = "إحصائيات الإنجاز",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimaryLight
-                            )
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceAround
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                StatCounterItem(
-                                    label = "إجمالي العادات",
-                                    value = "${stats.totalCount}",
-                                    color = BrightLilac
-                                )
-                                StatCounterItem(
-                                    label = "المكتملة اليوم",
-                                    value = "${stats.completedCount}",
-                                    color = Color(0xFF34D399)
-                                )
-                                StatCounterItem(
-                                    label = "أعلى التزام",
-                                    value = "${stats.longestStreak} يوم",
-                                    color = Color(0xFFF97316)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.BeachAccess,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFBBF24),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = Strings.current.vacationModeLabel,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AppTheme.colors.textPrimary
+                                        )
+                                        Text(
+                                            text = Strings.current.vacationModeDesc,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = AppTheme.colors.textMuted,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+
+                                Switch(
+                                    checked = isVacationMode,
+                                    onCheckedChange = { viewModel.toggleVacationMode(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = Color(0xFFF59E0B),
+                                        uncheckedThumbColor = AppTheme.colors.textMuted,
+                                        uncheckedTrackColor = AppTheme.colors.cardElevated
+                                    )
                                 )
                             }
                         }
                     }
                 }
 
-                // Section 2: Theme & Interface (Dark Purple & Arabic RTL)
+                // Section 1: Appearance Customization
                 item {
-                    SettingsSection(title = "المظهر والواجهة") {
-                        SettingsRow(
-                            icon = Icons.Default.Palette,
-                            title = "سمة التطبيق",
-                            subtitle = "الأرجواني الداكن الفاخر (مفعّل دائماً)",
-                            actionContent = {
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(VividPurple)
-                                )
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        SettingsRow(
-                            icon = Icons.Default.Language,
-                            title = "لغة التطبيق",
-                            subtitle = "العربية (Arabic)",
-                            actionContent = {
-                                Text(
-                                    text = "العربية",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = BrightLilac,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        SettingsRow(
-                            icon = Icons.Default.FormatTextdirectionRToL,
-                            title = "محاذاة النص",
-                            subtitle = "من اليمين إلى اليسار (RTL كامل وشامل)",
-                            actionContent = {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.FormatTextdirectionRToL,
+                                    imageVector = Icons.Default.Palette,
                                     contentDescription = null,
-                                    tint = BrightLilac,
+                                    tint = AppTheme.colors.primary,
                                     modifier = Modifier.size(20.dp)
                                 )
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        SettingsRow(
-                            icon = Icons.Default.DarkMode,
-                            title = "الوضع الليلي",
-                            subtitle = "مفعّل تلقائياً لحماية العين وتوفير البطارية",
-                            actionContent = {
                                 Text(
-                                    text = "داكن",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextMutedLight
+                                    text = Strings.current.appearanceSection,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AppTheme.colors.textPrimary
                                 )
                             }
-                        )
-                    }
-                }
 
-                // Section 3: Reminders & Notifications
-                item {
-                    SettingsSection(title = "التذكيرات والإشعارات") {
-                        SettingsRow(
-                            icon = Icons.Default.Alarm,
-                            title = "تذكير يومي بالعادات",
-                            subtitle = "تنبيه لطيف لتسجيل عاداتك اليومية",
-                            actionContent = {
-                                Switch(
-                                    checked = remindersEnabled,
-                                    onCheckedChange = { viewModel.toggleReminders() },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = TextPrimaryLight,
-                                        checkedTrackColor = VividPurple,
-                                        uncheckedThumbColor = TextMutedLight,
-                                        uncheckedTrackColor = RoyalPurpleElevated
-                                    )
-                                )
-                            }
-                        )
-
-                        if (remindersEnabled) {
-                            SettingsDivider()
-
-                            Box {
-                                SettingsRow(
-                                    icon = Icons.Default.Alarm,
-                                    title = "وقت التذكير المفضل",
-                                    subtitle = reminderTime,
-                                    onClick = { showTimePickerMenu = true },
-                                    actionContent = {
-                                        TextButton(onClick = { showTimePickerMenu = true }) {
-                                            Text(
-                                                text = "تعديل",
-                                                color = BrightLilac,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
+                            // Theme Palette
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = Strings.current.themePaletteLabel,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppTheme.colors.textSecondary,
+                                    fontWeight = FontWeight.SemiBold
                                 )
 
-                                DropdownMenu(
-                                    expanded = showTimePickerMenu,
-                                    onDismissRequest = { showTimePickerMenu = false },
-                                    modifier = Modifier.background(DeepVioletSurface)
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    reminderTimeOptions.forEach { timeOption ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = timeOption,
-                                                    color = TextPrimaryLight,
-                                                    style = MaterialTheme.typography.bodyMedium
+                                    AppThemePalette.values().forEach { palette ->
+                                        val isSelected = themeSettings.palette == palette
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = { viewModel.setThemePalette(palette) },
+                                            leadingIcon = {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(14.dp)
+                                                        .clip(CircleShape)
+                                                        .background(palette.previewColor)
                                                 )
                                             },
-                                            onClick = {
-                                                viewModel.setReminderTime(timeOption)
-                                                showTimePickerMenu = false
-                                            }
+                                            label = {
+                                                Text(
+                                                    if (isArabic) palette.displayNameArabic else palette.displayNameEnglish,
+                                                    fontSize = 12.sp
+                                                )
+                                            },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = AppTheme.colors.primary,
+                                                selectedLabelColor = Color.White,
+                                                containerColor = AppTheme.colors.cardElevated,
+                                                labelColor = AppTheme.colors.textSecondary
+                                            ),
+                                            border = FilterChipDefaults.filterChipBorder(
+                                                enabled = true,
+                                                selected = isSelected,
+                                                borderColor = AppTheme.colors.highlight,
+                                                selectedBorderColor = AppTheme.colors.primary
+                                            ),
+                                            shape = RoundedCornerShape(10.dp)
                                         )
                                     }
                                 }
                             }
+
+                            // Lighting Mode (Dark / Light)
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = Strings.current.lightingModeLabel,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppTheme.colors.textSecondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val isDark = themeSettings.mode == ThemeMode.DARK
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isDark) AppTheme.colors.primary else AppTheme.colors.cardElevated)
+                                            .clickable { viewModel.setThemeMode(ThemeMode.DARK) }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.DarkMode,
+                                                contentDescription = null,
+                                                tint = if (isDark) Color.White else AppTheme.colors.textMuted,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = Strings.current.darkModeLabel,
+                                                color = if (isDark) Color.White else AppTheme.colors.textSecondary,
+                                                fontWeight = if (isDark) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+
+                                    val isLight = themeSettings.mode == ThemeMode.LIGHT
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isLight) AppTheme.colors.primary else AppTheme.colors.cardElevated)
+                                            .clickable { viewModel.setThemeMode(ThemeMode.LIGHT) }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.LightMode,
+                                                contentDescription = null,
+                                                tint = if (isLight) Color.White else AppTheme.colors.textMuted,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = Strings.current.lightModeLabel,
+                                                color = if (isLight) Color.White else AppTheme.colors.textSecondary,
+                                                fontWeight = if (isLight) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Card Density
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = Strings.current.cardDensityLabel,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppTheme.colors.textSecondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val isComfortable = themeSettings.cardDensity == CardDensity.COMFORTABLE
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isComfortable) AppTheme.colors.primary else AppTheme.colors.cardElevated)
+                                            .clickable { viewModel.setCardDensity(CardDensity.COMFORTABLE) }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = Strings.current.densityComfortable,
+                                            color = if (isComfortable) Color.White else AppTheme.colors.textSecondary,
+                                            fontWeight = if (isComfortable) FontWeight.Bold else FontWeight.Normal,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+
+                                    val isCompact = themeSettings.cardDensity == CardDensity.COMPACT
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isCompact) AppTheme.colors.primary else AppTheme.colors.cardElevated)
+                                            .clickable { viewModel.setCardDensity(CardDensity.COMPACT) }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = Strings.current.densityCompact,
+                                            color = if (isCompact) Color.White else AppTheme.colors.textSecondary,
+                                            fontWeight = if (isCompact) FontWeight.Bold else FontWeight.Normal,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Font Scale Preference
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = Strings.current.fontScaleLabel,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppTheme.colors.textSecondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    FontScalePreference.values().forEach { scale ->
+                                        val isSelected = themeSettings.fontScale == scale
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(if (isSelected) AppTheme.colors.primary else AppTheme.colors.cardElevated)
+                                                .clickable { viewModel.setFontScale(scale) }
+                                                .padding(vertical = 8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = if (isArabic) scale.displayNameArabic else scale.displayNameEnglish,
+                                                color = if (isSelected) Color.White else AppTheme.colors.textSecondary,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Reset Theme Button
+                            OutlinedButton(
+                                onClick = { viewModel.resetThemeSettings() },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = AppTheme.colors.textSecondary
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.highlight)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.RestartAlt,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = Strings.current.resetThemeButton,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
                 }
 
-                // Section 4: Data Management
-                item {
-                    SettingsSection(title = "إدارة البيانات") {
-                        SettingsRow(
-                            icon = Icons.Default.RestartAlt,
-                            title = "إعادة تعيين إنجازات اليوم",
-                            subtitle = "إلغاء تحديد كل العادات ليومنا هذا",
-                            onClick = { showResetConfirmDialog = true },
-                            actionContent = {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    tint = BrightLilac
-                                )
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        SettingsRow(
-                            icon = Icons.Default.AutoAwesome,
-                            title = "استعادة العادات النموذجية",
-                            subtitle = "إضافة مجموعة عادات مقترحة (ماء، قراءة، رياضة...)",
-                            onClick = { viewModel.loadSampleHabits() },
-                            actionContent = {
-                                TextButton(onClick = { viewModel.loadSampleHabits() }) {
-                                    Text(
-                                        text = "تحميل",
-                                        color = BrightLilac,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        SettingsRow(
-                            icon = Icons.Default.DeleteForever,
-                            title = "مسح جميع البيانات",
-                            subtitle = "حذف جميع العادات وسجل الإنجازات نهائياً",
-                            onClick = { showClearConfirmDialog = true },
-                            actionContent = {
-                                Icon(
-                                    imageVector = Icons.Default.DeleteForever,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        )
-                    }
-                }
-
-                // Section 5: About App & Quote
+                // Section 2: Language & RTL
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = RoyalPurpleCard),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderPurple)
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(18.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = BrightLilac,
-                                modifier = Modifier.size(28.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = null,
+                                    tint = AppTheme.colors.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = Strings.current.languageSection,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AppTheme.colors.textPrimary
+                                )
+                            }
 
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = "تطبيق عاداتي",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimaryLight
-                            )
-
-                            Text(
-                                text = "الإصدار 1.0.0 • صُمم لمساعدتك على الاستمرار والنمو",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextMutedLight
-                            )
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Box(
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(RoyalPurpleElevated)
-                                    .padding(12.dp),
-                                contentAlignment = Alignment.Center
+                                    .background(AppTheme.colors.cardElevated)
+                                    .clickable { showLanguageDialog = true }
+                                    .padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = Strings.current.appLanguageLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AppTheme.colors.textPrimary
+                                    )
+                                    Text(
+                                        text = appLanguage.displayName,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppTheme.colors.primary
+                                    )
+                                }
+
                                 Text(
-                                    text = "«أَحَبُّ الأَعْمَالِ إِلَى اللهِ أَدْوَمُهَا وَإِنْ قَلَّ»",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = LightLilac,
-                                    textAlign = TextAlign.Center
+                                    text = Strings.current.layoutDirectionValue,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = AppTheme.colors.textMuted
                                 )
                             }
                         }
+                    }
+                }
+
+                // Section 3: Forgiving Streak & Momentum Explanation
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Shield,
+                                    contentDescription = null,
+                                    tint = Color(0xFF38BDF8),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = Strings.current.forgivingStreakSection,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AppTheme.colors.textPrimary
+                                )
+                            }
+
+                            Text(
+                                text = Strings.current.momentumExplanation,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppTheme.colors.textSecondary,
+                                lineHeight = 20.sp
+                            )
+                        }
+                    }
+                }
+
+                // Section 4: Reminders
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Notifications,
+                                    contentDescription = null,
+                                    tint = AppTheme.colors.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = Strings.current.remindersSection,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AppTheme.colors.textPrimary
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = Strings.current.dailyReminderLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AppTheme.colors.textPrimary
+                                    )
+                                    Text(
+                                        text = Strings.current.dailyReminderDesc,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppTheme.colors.textMuted,
+                                        fontSize = 11.sp
+                                    )
+                                }
+
+                                Switch(
+                                    checked = remindersEnabled,
+                                    onCheckedChange = { viewModel.toggleReminders(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = AppTheme.colors.primary,
+                                        uncheckedThumbColor = AppTheme.colors.textMuted,
+                                        uncheckedTrackColor = AppTheme.colors.cardElevated
+                                    )
+                                )
+                            }
+
+                            if (remindersEnabled) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(AppTheme.colors.cardElevated)
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Alarm,
+                                            contentDescription = null,
+                                            tint = AppTheme.colors.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = Strings.current.reminderTimeLabel,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = AppTheme.colors.textPrimary
+                                        )
+                                    }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = reminderTime,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AppTheme.colors.primary,
+                                            fontSize = 14.sp
+                                        )
+
+                                        Button(
+                                            onClick = {
+                                                val (h, m) = HabitReminderScheduler.parseTimeString(reminderTime)
+                                                TimePickerDialog(
+                                                    context,
+                                                    { _, selectedHour, selectedMinute ->
+                                                        val amPm = if (selectedHour < 12) "AM" else "PM"
+                                                        val displayHour = if (selectedHour % 12 == 0) 12 else selectedHour % 12
+                                                        val formattedTime = String.format(Locale.US, "%02d:%02d %s", displayHour, selectedMinute, amPm)
+                                                        viewModel.setReminderTime(formattedTime)
+                                                    },
+                                                    h,
+                                                    m,
+                                                    false
+                                                ).show()
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text(text = Strings.current.editButton, fontSize = 11.sp, color = Color.White)
+                                        }
+                                    }
+                                }
+
+                                Button(
+                                    onClick = { viewModel.sendTestNotificationNow() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = AppTheme.colors.cardElevated,
+                                        contentColor = AppTheme.colors.primary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Notifications,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = Strings.current.testReminderBtn,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Section 5: Data Management
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.border)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Text(
+                                text = Strings.current.dataManagementSection,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = AppTheme.colors.textPrimary
+                            )
+
+                            // Reset Today Progress
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = Strings.current.resetTodayLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AppTheme.colors.textPrimary
+                                    )
+                                    Text(
+                                        text = Strings.current.resetTodayDesc,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppTheme.colors.textMuted,
+                                        fontSize = 11.sp
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = { showResetTodayDialog = true },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = AppTheme.colors.primary
+                                    ),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.highlight)
+                                ) {
+                                    Text(text = Strings.current.resetTodayConfirmBtn, fontSize = 11.sp)
+                                }
+                            }
+
+                            // Load Sample Habits
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = Strings.current.loadSampleHabitsLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AppTheme.colors.textPrimary
+                                    )
+                                    Text(
+                                        text = Strings.current.loadSampleHabitsDesc,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppTheme.colors.textMuted,
+                                        fontSize = 11.sp
+                                    )
+                                }
+
+                                Button(
+                                    onClick = { viewModel.loadSampleHabits() },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = AppTheme.colors.primary
+                                    )
+                                ) {
+                                    Text(text = Strings.current.loadBtn, fontSize = 11.sp, color = Color.White)
+                                }
+                            }
+
+                            // Clear All Data
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = Strings.current.clearAllDataLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                    Text(
+                                        text = Strings.current.clearAllDataDesc,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppTheme.colors.textMuted,
+                                        fontSize = 11.sp
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = { showClearAllDialog = true },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    ),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                                ) {
+                                    Text(text = Strings.current.clearAllDataConfirmBtn, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Section 6: About
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = Strings.current.appNameDisplay,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = AppTheme.colors.textPrimary
+                        )
+                        Text(
+                            text = Strings.current.appVersionInfo,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppTheme.colors.textMuted
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = Strings.current.appQuote,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppTheme.colors.primary,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             }
         }
 
-        // Reset Today Confirm Dialog
-        if (showResetConfirmDialog) {
+        // Language Switch Dialog
+        if (showLanguageDialog) {
             AlertDialog(
-                onDismissRequest = { showResetConfirmDialog = false },
-                containerColor = DeepVioletSurface,
-                titleContentColor = TextPrimaryLight,
-                textContentColor = TextSecondaryLight,
+                onDismissRequest = { showLanguageDialog = false },
                 title = {
-                    Text("إعادة تعيين اليوم", fontWeight = FontWeight.Bold, textAlign = TextAlign.Start)
+                    Text(
+                        text = Strings.current.switchLanguageDialogTitle,
+                        fontWeight = FontWeight.Bold,
+                        color = AppTheme.colors.textPrimary
+                    )
                 },
                 text = {
-                    Text("هل ترغب في إلغاء تحديد علامات الإنجاز لجميع عادات اليوم؟", textAlign = TextAlign.Start)
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            viewModel.resetToday()
-                            showResetConfirmDialog = false
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = VividPurple)
-                    ) {
-                        Text("نعم، إعادة ضبط")
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AppLanguage.values().forEach { lang ->
+                            val isSelected = appLanguage == lang
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) AppTheme.colors.primary.copy(alpha = 0.15f) else Color.Transparent)
+                                    .clickable {
+                                        viewModel.switchLanguage(lang)
+                                        showLanguageDialog = false
+                                    }
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = lang.displayName,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) AppTheme.colors.primary else AppTheme.colors.textPrimary
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = AppTheme.colors.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showResetConfirmDialog = false }) {
-                        Text("إلغاء", color = TextSecondaryLight)
+                confirmButton = {
+                    TextButton(onClick = { showLanguageDialog = false }) {
+                        Text(Strings.current.cancel, color = AppTheme.colors.textSecondary)
                     }
                 }
             )
         }
 
-        // Clear All Data Confirm Dialog
-        if (showClearConfirmDialog) {
+        // Reset Today Confirmation Dialog
+        if (showResetTodayDialog) {
             AlertDialog(
-                onDismissRequest = { showClearConfirmDialog = false },
-                containerColor = DeepVioletSurface,
-                titleContentColor = TextPrimaryLight,
-                textContentColor = TextSecondaryLight,
+                onDismissRequest = { showResetTodayDialog = false },
                 title = {
-                    Text("مسح كافة البيانات", fontWeight = FontWeight.Bold, textAlign = TextAlign.Start)
+                    Text(
+                        text = Strings.current.resetTodayConfirmTitle,
+                        fontWeight = FontWeight.Bold,
+                        color = AppTheme.colors.textPrimary
+                    )
                 },
                 text = {
                     Text(
-                        "تحذير: سيتم حذف جميع العادات وسجلات الإنجاز السابقة بشكل نهائي. هل تود المتابعة؟",
-                        textAlign = TextAlign.Start
+                        text = Strings.current.resetTodayConfirmMessage,
+                        color = AppTheme.colors.textSecondary
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.resetTodayProgress()
+                            showResetTodayDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary)
+                    ) {
+                        Text(Strings.current.resetTodayConfirmBtn, color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetTodayDialog = false }) {
+                        Text(Strings.current.cancel, color = AppTheme.colors.textSecondary)
+                    }
+                }
+            )
+        }
+
+        // Clear All Data Confirmation Dialog
+        if (showClearAllDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearAllDialog = false },
+                title = {
+                    Text(
+                        text = Strings.current.clearAllDataConfirmTitle,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                },
+                text = {
+                    Text(
+                        text = Strings.current.clearAllDataConfirmMessage,
+                        color = AppTheme.colors.textSecondary
                     )
                 },
                 confirmButton = {
                     Button(
                         onClick = {
                             viewModel.clearAllData()
-                            showClearConfirmDialog = false
+                            showClearAllDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) {
-                        Text("حذف الكل")
+                        Text(Strings.current.clearAllDataConfirmBtn, color = Color.White)
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showClearConfirmDialog = false }) {
-                        Text("إلغاء", color = TextSecondaryLight)
+                    TextButton(onClick = { showClearAllDialog = false }) {
+                        Text(Strings.current.cancel, color = AppTheme.colors.textSecondary)
                     }
                 }
             )
         }
-    }
-}
-
-@Composable
-fun SettingsSection(
-    title: String,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = BrightLilac,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
-            textAlign = TextAlign.Start
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = RoyalPurpleCard),
-            border = androidx.compose.foundation.BorderStroke(1.dp, BorderPurple)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            ) {
-                content()
-            }
-        }
-    }
-}
-
-@Composable
-fun SettingsRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String? = null,
-    onClick: (() -> Unit)? = null,
-    actionContent: @Composable (() -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    val rowModifier = if (onClick != null) {
-        modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    } else {
-        modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    }
-
-    Row(
-        modifier = rowModifier,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(RoyalPurpleElevated),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = BrightLilac,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimaryLight,
-                textAlign = TextAlign.Start
-            )
-            if (subtitle != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMutedLight,
-                    textAlign = TextAlign.Start
-                )
-            }
-        }
-
-        if (actionContent != null) {
-            Spacer(modifier = Modifier.width(8.dp))
-            actionContent()
-        }
-    }
-}
-
-@Composable
-fun SettingsDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        thickness = 1.dp,
-        color = RoyalPurpleHighlight
-    )
-}
-
-@Composable
-fun StatCounterItem(
-    label: String,
-    value: String,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.ExtraBold,
-            color = color
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextMutedLight,
-            textAlign = TextAlign.Center
-        )
     }
 }
